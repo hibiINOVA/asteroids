@@ -2,7 +2,7 @@
 
 ## Project
 
-Single-file HTML5 Canvas game (`game.js`, ~420 lines). No build system, no bundler, no dependencies, no tests, no linting. Canvas is hardcoded to 800x600.
+Single-file HTML5 Canvas game (`game.js`, ~940 lines). No build system, no bundler, no dependencies, no tests, no linting. Canvas is hardcoded to 800x600.
 
 ## Run
 
@@ -13,7 +13,7 @@ Open `index.html` in a browser, or `npx serve .` then visit `localhost:3000`.
 - All game logic lives in `game.js`. Everything is in the global scope (no modules).
 - Constants are defined as arrays indexed by asteroid size (1=small, 2=medium, 3=large) in `RADII`, `SPEEDS`, `POINTS`.
 - Screen wrapping uses the `wrap()` utility (toroidal space).
-- Game states: `'playing'`, `'dead'` (respawn timer), `'gameover'`.
+- Game states: `'playing'`, `'dead'` (respawn timer), `'skins'` (selection menu), `'gameover'`.
 - UI text and code comments are in Spanish.
 - `'use strict'` at top. No semicolons on some lines, mixed style — match the surrounding code.
 
@@ -24,3 +24,6 @@ Open `index.html` in a browser, or `npx serve .` then visit `localhost:3000`.
 - Ship collision radius uses `a.radius * 0.82` multiplier (slightly forgiving).
 - `nextLevel()` clears bullets and particles but keeps the asteroid count based on `level`.
 - `spawnAsteroids` enforces a 130px safe zone from center.
+- Ship drawing uses `SKINS[selectedSkin]` for polygon shape; colors override on power-up activation.
+- `POWERUP_TYPES` includes `'triple'` (index 3) — use `randInt(0, POWERUP_TYPES.length - 1)` when spawning.
+- Enemy bullets from `MiniAlien` use `new Bullet(..., true)` — check `b.isEnemy` for shield collision.

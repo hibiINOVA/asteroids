@@ -24,11 +24,12 @@ Luego visita `http://localhost:3000`.
 
 ## Controles
 
-| Tecla     | Acción     |
-| --------- | ---------- |
-| `←` `→`   | Rotar nave |
-| `↑`       | Propulsar  |
-| `Espacio` | Disparar   |
+| Tecla | Acción |
+| ----- | ------ |
+| `←` `→` | Rotar nave |
+| `↑` | Propulsar |
+| `Espacio` | Disparar |
+| `Enter` | Seleccionar skin / Iniciar juego |
 
 ## Puntuación
 
@@ -43,3 +44,6 @@ Luego visita `http://localhost:3000`.
 - 3 vidas con invencibilidad temporal al reaparecer (parpadeo)
 - Asteroides se parten en fragmentos más pequeños al ser destruidos
 - Partículas de explosión al destruir asteroides
+- **Escudo**: reduce daño de balas enemigas, parpadea en blanco al recibir golpe
+- **Triple disparo**: disparo de 3 balas en abertura, power-up dedicado
+- **4 skins de nave**: Clásico, Fury, Shadow, Nova — seleccionables con `←` `→` y persistencia en `localStorage`
