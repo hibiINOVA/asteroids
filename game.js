@@ -12,7 +12,7 @@ const justPressed = {};
 window.addEventListener('keydown', e => {
   justPressed[e.code] = !keys[e.code];
   keys[e.code] = true;
-  if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code))
+  if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Enter'].includes(e.code))
     e.preventDefault();
 });
 window.addEventListener('keyup', e => { keys[e.code] = false; });
@@ -29,12 +29,33 @@ const dist  = (a, b)   => Math.hypot(a.x - b.x, a.y - b.y);
 const rand  = (min, max) => min + Math.random() * (max - min);
 const randInt = (min, max) => Math.floor(rand(min, max + 1));
 
+// ── Skins ────────────────────────────────────────────────────────────────────
+const SKINS = [
+  { name: 'CLÁSICO', color: '#e8e8e8', trail: '#ffffff',
+    verts: [[20,0],[-12,-9],[-7,0],[-12,9]] },
+  { name: 'FURY', color: '#ff3333', trail: '#ff8800',
+    verts: [[20,0],[-15,-10],[-7,0],[-15,10]] },
+  { name: 'SHADOW', color: '#9944ff', trail: '#cc66ff',
+    verts: [[24,0],[-10,-7],[-5,0],[-10,7]] },
+  { name: 'NOVA', color: '#00ccff', trail: '#44ddff',
+    verts: [[18,0],[0,-8],[-8,-4],[-4,0],[-8,4],[0,8]] },
+];
+
+let selectedSkin = 0;
+try { selectedSkin = parseInt(localStorage.getItem('asteroidSkin') || '0'); } catch(e) {}
+selectedSkin = Math.max(0, Math.min(SKINS.length - 1, selectedSkin));
+
+function saveSkin() {
+  try { localStorage.setItem('asteroidSkin', selectedSkin.toString()); } catch(e) {}
+}
+
 // ── Bullet ────────────────────────────────────────────────────────────────────
 class Bullet {
-  constructor(x, y, angle, speed = 520, color = '#fff') {
+  constructor(x, y, angle, speed = 520, color = '#fff', isEnemy = false) {
     this.x = x;
     this.y = y;
     this.color = color;
+    this.isEnemy = isEnemy;
     this.vx = Math.cos(angle) * speed;
     this.vy = Math.sin(angle) * speed;
     this.ttl  = 1.1;
@@ -58,9 +79,9 @@ class Bullet {
 }
 
 // ── Asteroid ──────────────────────────────────────────────────────────────────
-const RADII  = [0, 16, 30, 50];   // por tamaño 1, 2, 3
-const SPEEDS = [0, 85, 55, 32];   // velocidad base por tamaño
-const POINTS = [0, 100, 50, 20];  // puntos por tamaño
+const RADII  = [0, 16, 30, 50];
+const SPEEDS = [0, 85, 55, 32];
+const POINTS = [0, 100, 50, 20];
 
 class Asteroid {
   constructor(x, y, size = 3) {
@@ -77,7 +98,6 @@ class Asteroid {
     this.rotSpeed = rand(-1.2, 1.2);
     this.rot = rand(0, Math.PI * 2);
 
-    // Polígono irregular
     const n = randInt(8, 13);
     this.verts = [];
     for (let i = 0; i < n; i++) {
@@ -118,7 +138,7 @@ class Asteroid {
   }
 }
 
-// ── Estrella Fugaz ───────────────────────────────────────────────────────────
+// ── Estrella Fugaz ──────────────────────────────────────────────────────────
 class ShootingStar {
   constructor(x, y, angle) {
     this.x = x;
@@ -190,6 +210,8 @@ class Ship {
     this.speedBoost    = 0;
     this.doubleShot    = 0;
     this.shield        = 0;
+    this.shieldHit     = 0;
+    this.tripleShot    = 0;
   }
 
   update(dt) {
@@ -199,9 +221,11 @@ class Ship {
     if (this.speedBoost    > 0) this.speedBoost    -= dt;
     if (this.doubleShot    > 0) this.doubleShot    -= dt;
     if (this.shield        > 0) this.shield        -= dt;
+    if (this.shieldHit     > 0) this.shieldHit     -= dt;
+    if (this.tripleShot    > 0) this.tripleShot    -= dt;
 
-    const ROT   = 3.5;   // rad/s
-    const THRUST = this.speedBoost > 0 ? 520 : 260;  // px/s²
+    const ROT   = 3.5;
+    const THRUST = this.speedBoost > 0 ? 520 : 260;
     const DRAG   = 0.987;
 
     if (keys['ArrowLeft'])  this.angle -= ROT * dt;
@@ -226,7 +250,11 @@ class Ship {
     const ox = this.x + Math.cos(this.angle) * NOSE;
     const oy = this.y + Math.sin(this.angle) * NOSE;
     const bullets = [new Bullet(ox, oy, this.angle)];
-    if (this.doubleShot > 0) {
+    if (this.tripleShot > 0) {
+      const SPREAD = 0.12;
+      bullets.push(new Bullet(ox, oy, this.angle - SPREAD));
+      bullets.push(new Bullet(ox, oy, this.angle + SPREAD));
+    } else if (this.doubleShot > 0) {
       const SPREAD = 0.15;
       bullets.push(new Bullet(ox, oy, this.angle - SPREAD));
       bullets.push(new Bullet(ox, oy, this.angle + SPREAD));
@@ -236,8 +264,9 @@ class Ship {
 
   draw() {
     if (this.dead) return;
-    // Parpadeo durante invencibilidad de reaparición
     if (this.invincible > 0 && Math.floor(this.invincible * 8) % 2 === 0) return;
+
+    const skin = SKINS[selectedSkin];
 
     ctx.save();
     ctx.translate(this.x, this.y);
@@ -245,23 +274,31 @@ class Ship {
 
     // Shield visual
     if (this.shield > 0) {
-      ctx.strokeStyle = `rgba(0,255,0,${(0.3 + 0.2 * Math.sin(Date.now() * 0.01)).toFixed(2)})`;
+      const flash = this.shieldHit > 0;
+      const a = flash ? 0.8 : (0.3 + 0.2 * Math.sin(Date.now() * 0.01));
+      const c = flash ? '255,255,255' : '0,255,0';
+      ctx.strokeStyle = `rgba(${c},${a.toFixed(2)})`;
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.arc(0, 0, this.radius + 6, 0, Math.PI * 2);
       ctx.stroke();
     }
 
-    ctx.strokeStyle = this.speedBoost > 0 ? '#ff0' : this.doubleShot > 0 ? '#0ff' : '#fff';
+let strokeColor = skin.color;
+    if (this.speedBoost > 0) strokeColor = '#ff0';
+    else if (this.tripleShot > 0) strokeColor = '#f80';
+    else if (this.doubleShot > 0) strokeColor = '#0ff';
+    else if (this.shield > 0) strokeColor = '#0f0';
+
+    ctx.strokeStyle = strokeColor;
     ctx.lineWidth   = 1.5;
     ctx.lineJoin    = 'round';
 
-    // Silueta clásica: triángulo con muesca trasera
+    // Dibuja la forma de la skin
     ctx.beginPath();
-    ctx.moveTo( 20,  0);   // nariz
-    ctx.lineTo(-12, -9);   // ala izquierda
-    ctx.lineTo( -7,  0);   // muesca trasera
-    ctx.lineTo(-12,  9);   // ala derecha
+    ctx.moveTo(skin.verts[0][0], skin.verts[0][1]);
+    for (let i = 1; i < skin.verts.length; i++)
+      ctx.lineTo(skin.verts[i][0], skin.verts[i][1]);
     ctx.closePath();
     ctx.stroke();
 
@@ -271,12 +308,19 @@ class Ship {
       ctx.moveTo(-8, -4);
       ctx.lineTo(-8 - rand(6, 14), 0);
       ctx.lineTo(-8,  4);
-      ctx.strokeStyle = 'rgba(255, 130, 0, 0.85)';
+      ctx.strokeStyle = `rgba(${hexToRgb(skin.trail)},0.85)`;
       ctx.stroke();
     }
 
     ctx.restore();
   }
+}
+
+function hexToRgb(hex) {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `${r},${g},${b}`;
 }
 
 // ── Partículas (explosión) ────────────────────────────────────────────────────
@@ -341,7 +385,7 @@ class MiniAlien {
     if (ship.dead) return [];
     const angle = Math.atan2(ship.y - this.y, ship.x - this.x);
     const SPEED = 350;
-    return [new Bullet(this.x, this.y, angle, SPEED, '#0f0')];
+    return [new Bullet(this.x, this.y, angle, SPEED, '#0f0', true)];
   }
 
   draw() {
@@ -366,7 +410,7 @@ class MiniAlien {
 }
 
 // ── Power Up ─────────────────────────────────────────────────────────────────
-const POWERUP_TYPES = ['speed', 'double', 'shield'];
+const POWERUP_TYPES = ['speed', 'double', 'shield', 'triple'];
 
 class PowerUp {
   constructor(x, y, type) {
@@ -392,7 +436,7 @@ class PowerUp {
 
   draw() {
     const pulse = 0.7 + 0.3 * Math.sin(Date.now() * 0.008);
-    const colorMap = { speed: '255,255,0', double: '0,255,255', shield: '0,255,0' };
+    const colorMap = { speed: '255,255,0', double: '0,255,255', shield: '0,255,0', triple: '255,128,0' };
     ctx.save();
     ctx.translate(this.x, this.y);
     ctx.strokeStyle = `rgba(${colorMap[this.type]},${pulse.toFixed(2)})`;
@@ -415,6 +459,15 @@ class PowerUp {
       ctx.lineTo(6, -4);
       ctx.lineTo(6, 8);
       ctx.lineTo(2, 8);
+    } else if (this.type === 'triple') {
+      ctx.moveTo(0, -8);
+      ctx.lineTo(-4, -3);
+      ctx.lineTo(-1, -3);
+      ctx.lineTo(-5, 3);
+      ctx.moveTo(0, 8);
+      ctx.lineTo(4, 3);
+      ctx.lineTo(1, 3);
+      ctx.lineTo(5, -3);
     } else {
       ctx.arc(0, 0, 8, 0, Math.PI * 2);
       ctx.moveTo(0, -5);
@@ -431,7 +484,7 @@ class PowerUp {
 // ── Estado del juego ──────────────────────────────────────────────────────────
 let ship, bullets, asteroids, particles, miniAliens, powerups, shootingStars;
 let score, lives, level;
-let state;      // 'playing' | 'dead' | 'gameover'
+let state;
 let deadTimer;
 let shootingStarTimer;
 
@@ -449,6 +502,21 @@ function spawnAsteroids(count) {
 
 function initGame() {
   ship          = new Ship();
+  bullets   = [];
+  asteroids = [];
+  particles = [];
+  miniAliens = [];
+  powerups  = [];
+  shootingStars = [];
+  shootingStarTimer = rand(10, 15);
+  score  = 0;
+  lives  = 3;
+  level  = 1;
+  state  = 'skins';
+}
+
+function startGame() {
+  ship.reset();
   bullets   = [];
   asteroids = [];
   particles = [];
@@ -491,10 +559,102 @@ function killShip() {
   }
 }
 
+// ── Pantalla de selección de skins ────────────────────────────────────────────
+function drawSkinMenu() {
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, W, H);
+
+  // Título
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 32px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('SELECCIONA TU NAVE', W / 2, 90);
+
+  // Nave grande en preview
+  const skin = SKINS[selectedSkin];
+  ctx.save();
+  ctx.translate(W / 2, 250);
+  ctx.scale(2.5, 2.5);
+  ctx.strokeStyle = skin.color;
+  ctx.lineWidth = 1.5;
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  ctx.moveTo(skin.verts[0][0], skin.verts[0][1]);
+  for (let i = 1; i < skin.verts.length; i++)
+    ctx.lineTo(skin.verts[i][0], skin.verts[i][1]);
+  ctx.closePath();
+  ctx.stroke();
+  ctx.restore();
+
+  // Nombre de la skin seleccionada
+  ctx.fillStyle = skin.color;
+  ctx.font = 'bold 20px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText(skin.name, W / 2, 320);
+
+  // Miniaturas y nombres de todas las skins
+  const shipSpacing = 170;
+  const startX = W / 2 - (SKINS.length - 1) * shipSpacing / 2;
+
+  SKINS.forEach((s, i) => {
+    const x = startX + i * shipSpacing;
+    const isSelected = i === selectedSkin;
+
+    // Miniatura de la nave
+    ctx.save();
+    ctx.translate(x, 380);
+    ctx.scale(1.2, 1.2);
+    ctx.strokeStyle = isSelected ? '#fff' : 'rgba(255,255,255,0.35)';
+    ctx.lineWidth = isSelected ? 1.5 : 1;
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    ctx.moveTo(s.verts[0][0], s.verts[0][1]);
+    for (let j = 1; j < s.verts.length; j++)
+      ctx.lineTo(s.verts[j][0], s.verts[j][1]);
+    ctx.closePath();
+    ctx.stroke();
+    ctx.restore();
+
+    // Nombre
+    ctx.fillStyle = isSelected ? '#fff' : 'rgba(255,255,255,0.5)';
+    ctx.font = isSelected ? 'bold 16px monospace' : '16px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(s.name, x, 450);
+
+    // Indicador de selección
+    if (isSelected) {
+      ctx.strokeStyle = s.color;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(x, 465, 8, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+  });
+
+  // Instrucciones
+  ctx.fillStyle = 'rgba(255,255,255,0.6)';
+  ctx.font = '14px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('← → CAMBIAR NAVE   ENTER   EMPEZAR', W / 2, 520);
+}
+
 // ── Update ────────────────────────────────────────────────────────────────────
 function update(dt) {
+  // Pantalla de skins
+  if (state === 'skins') {
+    if (pressed('ArrowLeft') || pressed('ArrowRight')) {
+      if (pressed('ArrowLeft')) selectedSkin = (selectedSkin - 1 + SKINS.length) % SKINS.length;
+      else selectedSkin = (selectedSkin + 1) % SKINS.length;
+      saveSkin();
+    }
+    if (pressed('Enter')) startGame();
+    return;
+  }
+
   if (state === 'gameover') {
-    if (pressed('Space')) initGame();
+    if (pressed('Space')) {
+      state = 'skins';
+    }
     particles.forEach(p => p.update(dt));
     particles = particles.filter(p => !p.dead);
     return;
@@ -563,14 +723,13 @@ function update(dt) {
         score += POINTS[a.size];
         explode(a.x, a.y, a.size * 5);
         newAsteroids.push(...a.split());
-        // 15% chance to spawn mini alien
         if (Math.random() < 0.15) {
           miniAliens.push(new MiniAlien(a.x, a.y));
         }
       }
     }
   }
-  bullets   = bullets.filter(b => !b.dead);
+  bullets = bullets.filter(b => !b.dead);
 
   // Bala vs mini alien
   for (const b of bullets) {
@@ -580,13 +739,13 @@ function update(dt) {
         a.dead = true;
         score += 200;
         explode(a.x, a.y, 10);
-        const type = POWERUP_TYPES[randInt(0, 2)];
+        const type = POWERUP_TYPES[randInt(0, POWERUP_TYPES.length - 1)];
         powerups.push(new PowerUp(a.x, a.y, type));
       }
     }
   }
   miniAliens = miniAliens.filter(a => !a.dead);
-  bullets   = bullets.filter(b => !b.dead);
+  bullets = bullets.filter(b => !b.dead);
 
   // Nave vs asteroide
   if (ship.invincible <= 0) {
@@ -616,6 +775,22 @@ function update(dt) {
     }
   }
 
+  // Bala enemiga vs nave
+  if (ship.invincible <= 0) {
+    for (const b of bullets) {
+      if (!b.dead && b.isEnemy && dist(b, ship) < ship.radius + b.radius) {
+        b.dead = true;
+        if (ship.shield > 0) {
+          ship.shield -= 1;
+          ship.shieldHit = 0.2;
+        } else {
+          killShip();
+          break;
+        }
+      }
+    }
+  }
+
   // Nave vs powerup
   for (const p of powerups) {
     if (!p.dead && dist(ship, p) < ship.radius + p.radius) {
@@ -623,6 +798,7 @@ function update(dt) {
       if (p.type === 'speed') ship.speedBoost = 5;
       else if (p.type === 'double') ship.doubleShot = 8;
       else if (p.type === 'shield') ship.shield = 6;
+      else if (p.type === 'triple') ship.tripleShot = 5;
     }
   }
   powerups = powerups.filter(p => !p.dead);
@@ -696,6 +872,7 @@ function drawHUD() {
   if (ship.speedBoost > 0) bars.push({ pct: ship.speedBoost / 5, color: '#ff0', max: 5 });
   if (ship.doubleShot > 0) bars.push({ pct: ship.doubleShot / 8, color: '#0ff', max: 8 });
   if (ship.shield > 0)     bars.push({ pct: ship.shield / 6, color: '#0f0', max: 6 });
+  if (ship.tripleShot > 0) bars.push({ pct: ship.tripleShot / 5, color: '#f80', max: 5 });
 
   const barW = 100;
   const barH = 6;
@@ -728,6 +905,11 @@ function draw() {
   ctx.fillStyle = '#000';
   ctx.fillRect(0, 0, W, H);
 
+  if (state === 'skins') {
+    drawSkinMenu();
+    return;
+  }
+
   particles.forEach(p => p.draw());
   asteroids.forEach(a => a.draw());
   shootingStars.forEach(s => s.draw());
@@ -739,7 +921,7 @@ function draw() {
   drawHUD();
 
   if (state === 'gameover')
-    drawOverlay('GAME OVER', `PUNTAJE: ${score}   —   ESPACIO PARA REINICIAR`);
+    drawOverlay('GAME OVER', `PUNTAJE: ${score}   —   ESPACIO PARA SELECCIONAR`);
 }
 
 // ── Loop principal ────────────────────────────────────────────────────────────
