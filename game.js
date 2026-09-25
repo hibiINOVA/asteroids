@@ -30,15 +30,19 @@ const rand  = (min, max) => min + Math.random() * (max - min);
 const randInt = (min, max) => Math.floor(rand(min, max + 1));
 
 // ── Skins ────────────────────────────────────────────────────────────────────
+// scale: tamaño relativo a la nave original (1 = normal)
+// scoreMult: multiplicador de puntos que otorga la nave
 const SKINS = [
-  { name: 'CLÁSICO', color: '#e8e8e8', trail: '#ffffff',
+  { name: 'CLÁSICO', color: '#e8e8e8', trail: '#ffffff', scale: 1, scoreMult: 1,
     verts: [[20,0],[-12,-9],[-7,0],[-12,9]] },
-  { name: 'FURY', color: '#ff3333', trail: '#ff8800',
+  { name: 'FURY', color: '#ff3333', trail: '#ff8800', scale: 1, scoreMult: 1,
     verts: [[20,0],[-15,-10],[-7,0],[-15,10]] },
-  { name: 'SHADOW', color: '#9944ff', trail: '#cc66ff',
+  { name: 'SHADOW', color: '#9944ff', trail: '#cc66ff', scale: 1, scoreMult: 1,
     verts: [[24,0],[-10,-7],[-5,0],[-10,7]] },
-  { name: 'NOVA', color: '#00ccff', trail: '#44ddff',
+  { name: 'NOVA', color: '#00ccff', trail: '#44ddff', scale: 1, scoreMult: 1,
     verts: [[18,0],[0,-8],[-8,-4],[-4,0],[-8,4],[0,8]] },
+  { name: 'TITAN', color: '#cc00ff', trail: '#ff44ff', scale: 2, scoreMult: 2,
+    verts: [[20,0],[-12,-9],[-7,0],[-12,9]] },
 ];
 
 let selectedSkin = 0;
@@ -202,7 +206,7 @@ class Ship {
     this.angle  = -Math.PI / 2;
     this.vx     = 0;
     this.vy     = 0;
-    this.radius = 12;
+    this.radius = 12 * SKINS[selectedSkin].scale;
     this.thrusting     = false;
     this.invincible    = 3;
     this.shootCooldown = 0;
@@ -246,7 +250,7 @@ class Ship {
   tryShoot() {
     if (this.shootCooldown > 0 || this.dead) return [];
     this.shootCooldown = 0.2;
-    const NOSE = 21;
+    const NOSE = 21 * SKINS[selectedSkin].scale;
     const ox = this.x + Math.cos(this.angle) * NOSE;
     const oy = this.y + Math.sin(this.angle) * NOSE;
     const bullets = [new Bullet(ox, oy, this.angle)];
@@ -290,6 +294,10 @@ let strokeColor = skin.color;
     else if (this.doubleShot > 0) strokeColor = '#0ff';
     else if (this.shield > 0) strokeColor = '#0f0';
 
+    // El tamaño de la nave depende de la skin (TITAN es el doble)
+    ctx.save();
+    ctx.scale(skin.scale, skin.scale);
+
     ctx.strokeStyle = strokeColor;
     ctx.lineWidth   = 1.5;
     ctx.lineJoin    = 'round';
@@ -312,6 +320,7 @@ let strokeColor = skin.color;
       ctx.stroke();
     }
 
+    ctx.restore();
     ctx.restore();
   }
 }
@@ -488,6 +497,11 @@ let state;
 let deadTimer;
 let shootingStarTimer;
 
+// Las skins con scoreMult > 1 (TITAN) otorgan el doble de puntos
+function addScore(points) {
+  score += points * SKINS[selectedSkin].scoreMult;
+}
+
 function spawnAsteroids(count) {
   const SAFE_DIST = 130;
   for (let i = 0; i < count; i++) {
@@ -574,7 +588,7 @@ function drawSkinMenu() {
   const skin = SKINS[selectedSkin];
   ctx.save();
   ctx.translate(W / 2, 250);
-  ctx.scale(2.5, 2.5);
+  ctx.scale(2.5 * skin.scale, 2.5 * skin.scale);
   ctx.strokeStyle = skin.color;
   ctx.lineWidth = 1.5;
   ctx.lineJoin = 'round';
@@ -592,6 +606,13 @@ function drawSkinMenu() {
   ctx.textAlign = 'center';
   ctx.fillText(skin.name, W / 2, 320);
 
+  // Ventaja de la skin (ej. TITAN otorga el doble de puntos)
+  if (skin.scoreMult > 1) {
+    ctx.fillStyle = '#ff44ff';
+    ctx.font = 'bold 15px monospace';
+    ctx.fillText(`PUNTOS x${skin.scoreMult}`, W / 2, 342);
+  }
+
   // Miniaturas y nombres de todas las skins
   const shipSpacing = 170;
   const startX = W / 2 - (SKINS.length - 1) * shipSpacing / 2;
@@ -602,8 +623,8 @@ function drawSkinMenu() {
 
     // Miniatura de la nave
     ctx.save();
-    ctx.translate(x, 380);
-    ctx.scale(1.2, 1.2);
+    ctx.translate(x, 400);
+    ctx.scale(1.2 * s.scale, 1.2 * s.scale);
     ctx.strokeStyle = isSelected ? '#fff' : 'rgba(255,255,255,0.35)';
     ctx.lineWidth = isSelected ? 1.5 : 1;
     ctx.lineJoin = 'round';
@@ -619,14 +640,14 @@ function drawSkinMenu() {
     ctx.fillStyle = isSelected ? '#fff' : 'rgba(255,255,255,0.5)';
     ctx.font = isSelected ? 'bold 16px monospace' : '16px monospace';
     ctx.textAlign = 'center';
-    ctx.fillText(s.name, x, 450);
+    ctx.fillText(s.name, x, 470);
 
     // Indicador de selección
     if (isSelected) {
       ctx.strokeStyle = s.color;
       ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.arc(x, 465, 8, 0, Math.PI * 2);
+      ctx.arc(x, 485, 8, 0, Math.PI * 2);
       ctx.stroke();
     }
   });
@@ -720,7 +741,7 @@ function update(dt) {
       if (!a.dead && !b.dead && dist(b, a) < a.radius) {
         b.dead = true;
         a.dead = true;
-        score += POINTS[a.size];
+        addScore(POINTS[a.size]);
         explode(a.x, a.y, a.size * 5);
         newAsteroids.push(...a.split());
         if (Math.random() < 0.15) {
@@ -737,7 +758,7 @@ function update(dt) {
       if (!a.dead && !b.dead && dist(b, a) < a.radius) {
         b.dead = true;
         a.dead = true;
-        score += 200;
+        addScore(200);
         explode(a.x, a.y, 10);
         const type = POWERUP_TYPES[randInt(0, POWERUP_TYPES.length - 1)];
         powerups.push(new PowerUp(a.x, a.y, type));
@@ -753,7 +774,7 @@ function update(dt) {
       if (dist(ship, a) < ship.radius + a.radius * 0.82) {
         if (ship.shield > 0) {
           a.dead = true;
-          score += POINTS[a.size];
+          addScore(POINTS[a.size]);
           explode(a.x, a.y, a.size * 5);
           newAsteroids.push(...a.split());
         } else {
@@ -809,7 +830,7 @@ function update(dt) {
       if (!s.dead && !b.dead && dist(b, s) < s.radius) {
         b.dead = true;
         s.dead = true;
-        score += 300;
+        addScore(300);
         explode(s.x, s.y, 12);
       }
     }
@@ -823,7 +844,7 @@ function update(dt) {
       if (dist(ship, s) < ship.radius + s.radius) {
         if (ship.shield > 0) {
           s.dead = true;
-          score += 300;
+          addScore(300);
           explode(s.x, s.y, 12);
         } else {
           killShip();
