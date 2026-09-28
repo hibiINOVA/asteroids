@@ -288,7 +288,7 @@ class Ship {
       ctx.stroke();
     }
 
-let strokeColor = skin.color;
+    let strokeColor = skin.color;
     if (this.speedBoost > 0) strokeColor = '#ff0';
     else if (this.tripleShot > 0) strokeColor = '#f80';
     else if (this.doubleShot > 0) strokeColor = '#0ff';
