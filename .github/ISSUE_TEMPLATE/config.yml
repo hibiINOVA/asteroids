@@ -1,0 +1,7 @@
+# Solo se ofrecen los formularios. Quien tenga permisos de escritura puede
+# igual crear un issue en blanco desde la API o con "Blank issue" en el menú.
+blank_issues_enabled: false
+contact_links:
+  - name: Convención del repo
+    url: https://github.com/hibiINOVA/asteroids/blob/main/AGENTS.md
+    about: Gotchas de game.js que hay que respetar antes de implementar cualquier cosa.

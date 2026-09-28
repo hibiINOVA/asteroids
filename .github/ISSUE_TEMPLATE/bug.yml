@@ -1,0 +1,82 @@
+name: 🐞 Bug
+description: Algo del juego no funciona como debería.
+title: '[Bug]: '
+labels: ['tipo:bug']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Gracias por reportar. El bot `issue-triage` va a etiquetar este issue y a
+        agregar al final la sección **Notas de implementación** con los gotchas
+        del repo, para que quien lo arregle no tenga que descubrirlos.
+
+  - type: checkboxes
+    id: busqueda
+    attributes:
+      label: Antes de enviar
+      options:
+        - label: Busqué los issues abiertos y no existe uno igual
+          required: true
+        - label: Lo reproduzco en un navegador con la consola abierta
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Área
+      description: >
+        El bot usa este campo para elegir la etiqueta `area:*`. Si no lo
+        completas, intenta deducirla del título y la descripción.
+      options:
+        - Gameplay — nave, asteroides, niveles, colisiones, puntuación
+        - Power-ups — escudo, triple, velocidad, doble puntos, estrella fugaz, minialien
+        - Skins — selección, formas, colores, persistencia en localStorage
+        - Render — canvas, dibujado, partículas, explosiones, animaciones
+        - UI — textos en pantalla, menús, contadores, game over
+        - Rendimiento — lag, fps, física, memoria
+        - Documentación — README, AGENTS.md
+    validations:
+      required: true
+
+  - type: dropdown
+    id: prioridad
+    attributes:
+      label: Prioridad
+      description: >
+        El bot usa este campo para elegir la etiqueta `prioridad:*`.
+      options:
+        - Alta — bloquea el juego, crashea o se pierde el progreso
+        - Media — se nota, pero se puede seguir jugando
+        - Baja — cosmético o diferible
+    validations:
+      required: true
+
+  - type: textarea
+    id: descripcion
+    attributes:
+      label: Qué pasó
+      description: Qué ocurre, y qué esperabas que ocurriera en su lugar.
+      placeholder: La nave atraviesa el asteroide grande cuando aparecen tres a la vez.
+    validations:
+      required: true
+
+  - type: textarea
+    id: pasos
+    attributes:
+      label: Pasos para reproducir
+      description: Pasos mínimos y numerados, desde abrir el juego.
+      render: text
+      placeholder: |
+        1. Abre index.html y pulsa Enter para empezar
+        2. Sobrevive al primer nivel
+        3. Al aparecer el segundo nivel, dispara al asteroide grande
+    validations:
+      required: true
+
+  - type: textarea
+    id: consola
+    attributes:
+      label: Consola y navegador
+      description: Salida de la consola si la hay, navegador y sistema.
+      render: text
+    validations:
+      required: false

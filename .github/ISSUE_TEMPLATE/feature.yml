@@ -1,0 +1,91 @@
+name: ✨ Feature o mejora
+description: Una funcionalidad nueva o un ajuste sobre algo que ya existe.
+title: '[Feature]: '
+labels: ['tipo:feature']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Gracias por proponerlo. El bot `issue-triage` va a etiquetar este issue y a
+        agregar al final la sección **Notas de implementación** con el contrato
+        técnico del repo.
+
+  - type: checkboxes
+    id: busqueda
+    attributes:
+      label: Antes de enviar
+      options:
+        - label: Busqué los issues abiertos y no está propuesto ya
+          required: true
+
+  - type: dropdown
+    id: tipo
+    attributes:
+      label: Tipo
+      description: >
+        El bot usa este campo para elegir la etiqueta `tipo:*`. Si no lo
+        completas, intenta deducirla del título y la descripción.
+      options:
+        - Feature — funcionalidad nueva
+        - Mejora — ajuste sobre algo que ya existe
+        - Documentación — solo textos
+        - Chore — tooling, workflow, mantenimiento
+      default: 0
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Área
+      description: >
+        El bot usa este campo para elegir la etiqueta `area:*`. Si no lo
+        completas, intenta deducirla del título y la descripción.
+      options:
+        - Gameplay — nave, asteroides, niveles, colisiones, puntuación
+        - Power-ups — escudo, triple, velocidad, doble puntos, estrella fugaz, minialien
+        - Skins — selección, formas, colores, persistencia en localStorage
+        - Render — canvas, dibujado, partículas, explosiones, animaciones
+        - UI — textos en pantalla, menús, contadores, game over
+        - Rendimiento — lag, fps, física, memoria
+        - Documentación — README, AGENTS.md
+    validations:
+      required: true
+
+  - type: dropdown
+    id: prioridad
+    attributes:
+      label: Prioridad
+      description: >
+        El bot usa este campo para elegir la etiqueta `prioridad:*`.
+      options:
+        - Alta — bloquea el juego, crashea o se pierde el progreso
+        - Media — se nota, pero se puede seguir jugando
+        - Baja — cosmético o diferible
+    validations:
+      required: true
+
+  - type: textarea
+    id: descripcion
+    attributes:
+      label: Qué quieres
+      description: Describe el comportamiento que quieres, no la solución técnica.
+      placeholder: Que los asteroides grandes aparezcan siempre desde un borde, no desde el centro.
+    validations:
+      required: true
+
+  - type: textarea
+    id: motivo
+    attributes:
+      label: Por qué
+      description: Qué problema resuelve o qué mejora la experiencia.
+    validations:
+      required: false
+
+  - type: textarea
+    id: referencias
+    attributes:
+      label: Referencias
+      description: Capturas, enlaces, o el issue del que sale esta idea.
+    validations:
+      required: false

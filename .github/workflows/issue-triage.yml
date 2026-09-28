@@ -1,0 +1,44 @@
+name: issue-triage
+
+# Formatea el cuerpo de cada issue, le pone labels, publica su ficha de triage,
+# y mantiene al día el issue "Tracker" (pineado) y docs/ISSUES.md.
+on:
+  issues:
+    types: [opened, edited, labeled, unlabeled, closed, reopened, transferred]
+  # Red de seguridad: los writes con GITHUB_TOKEN no re-disparan el evento
+  # `issues`, así que el tracker solo se refresca con eventos humanos o aquí.
+  schedule:
+    - cron: '17 4 * * *'
+  workflow_dispatch:
+
+permissions:
+  issues: write
+  contents: write
+
+# Serializa las escrituras del tracker y de docs/ISSUES.md para que dos runs
+# simultáneos no se pisen al commitear.
+concurrency:
+  group: issue-triage
+  cancel-in-progress: false
+
+jobs:
+  triage:
+    name: Formatear, etiquetar y registrar
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          # El script escribe por API; no hace falta el historial.
+          fetch-depth: 1
+
+      - name: Run triage
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          GITHUB_EVENT_PATH: ${{ github.event_path }}
+          TRACKER_BRANCH: ${{ github.event.repository.default_branch || 'main' }}
+        run: node .github/scripts/triage.mjs
