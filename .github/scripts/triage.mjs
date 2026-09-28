@@ -1,8 +1,9 @@
 'use strict'
 
 // Triaje automatico de issues para el repo de Asteroids.
-// Se ejecuta desde .github/workflows/issue-triage.yml con GITHUB_TOKEN.
-// Sin dependencias: solo fetch contra las APIs REST y GraphQL de GitHub.
+// Se ejecuta desde .github/workflows/issue-triage.yml con TRIAGE_TOKEN, que es un
+// installation token de la GitHub App `asteroids-triage` (no el GITHUB_TOKEN
+// automatico). Sin dependencias: solo fetch contra las APIs REST y GraphQL.
 
 import { readFileSync, existsSync } from 'node:fs'
 
@@ -10,7 +11,7 @@ const REST = 'https://api.github.com'
 const WEB = 'https://github.com'
 const GRAPHQL = `${REST}/graphql`
 
-const TOKEN = process.env.GITHUB_TOKEN
+const TOKEN = process.env.TRIAGE_TOKEN
 const REPO = process.env.GITHUB_REPOSITORY || ''
 const EVENT_NAME = process.env.GITHUB_EVENT_NAME || ''
 const EVENT_PATH = process.env.GITHUB_EVENT_PATH || ''
@@ -797,8 +798,23 @@ async function triageIssue(payloadIssue, action) {
 }
 
 async function main() {
-  if (!TOKEN) die('falta GITHUB_TOKEN')
+  if (!TOKEN) {
+    die(
+      'falta TRIAGE_TOKEN. Se espera el installation token de la GitHub App ' +
+      'asteroids-triage, que crea el paso "Crear token de instalacion" ' +
+      '(actions/create-github-app-token@v3). Revisa que esten ' +
+      'vars.APP_CLIENT_ID y el secret APP_PRIVATE_KEY, y que la App tenga ' +
+      'Issues: Read & write y Contents: Read & write. No hay fallback a ' +
+      'GITHUB_TOKEN a proposito. Ver docs/ISSUE_AUTOMATION.md'
+    )
+  }
   if (!OWNER || !NAME) die(`GITHUB_REPOSITORY invalido: "${REPO}"`)
+
+  // Nunca se imprime el token, pero si deja constancia de que credencial uso el
+  // run, que es lo primero que hace falta saber cuando algo falla.
+  const slug = process.env.APP_SLUG
+  const inst = process.env.APP_INSTALLATION_ID
+  log(`credencial: App ${slug || '?'} (instalacion ${inst || '?'})`)
 
   const event = EVENT_PATH && existsSync(EVENT_PATH)
     ? JSON.parse(readFileSync(EVENT_PATH, 'utf8'))

@@ -5,15 +5,15 @@ name: issue-triage
 on:
   issues:
     types: [opened, edited, labeled, unlabeled, closed, reopened, transferred]
-  # Red de seguridad: los writes con GITHUB_TOKEN no re-disparan el evento
-  # `issues`, así que el tracker solo se refresca con eventos humanos o aquí.
+  # Red de seguridad: si algún evento se pierde, el cron re-sincroniza todo.
   schedule:
     - cron: '17 4 * * *'
   workflow_dispatch:
 
+# El GITHUB_TOKEN automático ya no escribe nada: solo sirve para el checkout.
+# Todas las escrituras van con el installation token de la App.
 permissions:
-  issues: write
-  contents: write
+  contents: read
 
 # Serializa las escrituras del tracker y de docs/ISSUES.md para que dos runs
 # simultáneos no se pisen al commitear.
@@ -26,7 +26,32 @@ jobs:
     name: Formatear, etiquetar y registrar
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # Una App emite `sender.type: Bot`; una persona, `User`. Los writes de esta
+    # App re-disparan el evento `issues` (a diferencia de GITHUB_TOKEN), así que
+    # sin este guard cada edición encadenaría el siguiente run. En `schedule` el
+    # `sender` es null, y en `workflow_dispatch` es quien lo lanza: ambos deben pasar.
+    if: >-
+      github.event_name == 'schedule' ||
+      github.event_name == 'workflow_dispatch' ||
+      github.event.sender.type != 'Bot'
     steps:
+      - name: Comprobar configuracion de la App
+        if: ${{ !vars.APP_CLIENT_ID }}
+        run: |
+          echo "::error::Falta la variable APP_CLIENT_ID. Configura la GitHub App y sus credenciales siguiendo docs/ISSUE_AUTOMATION.md"
+          exit 1
+
+      - name: Crear token de instalacion
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.APP_CLIENT_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+          # Pedirlos explicitamente hace que la action valide el registro de la
+          # App y falle aqui si le faltan permisos, en vez de a mitad del triaje.
+          permission-issues: write
+          permission-contents: write
+
       - name: Checkout repository
         uses: actions/checkout@v6
         with:
@@ -36,7 +61,9 @@ jobs:
 
       - name: Run triage
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TRIAGE_TOKEN: ${{ steps.app-token.outputs.token }}
+          APP_SLUG: ${{ steps.app-token.outputs.app-slug }}
+          APP_INSTALLATION_ID: ${{ steps.app-token.outputs.installation-id }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           GITHUB_EVENT_NAME: ${{ github.event_name }}
           GITHUB_EVENT_PATH: ${{ github.event_path }}
